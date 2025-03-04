@@ -305,10 +305,10 @@ class Lock {
   }
 
   /** Clean expired lock path */
-  removeExpiredLockPath() {
+  async removeExpiredLockPath() {
     // if this.path's create time is older than cacheTTL, remove it
     try {
-      const fileInfo = Deno.statSync(this.path);
+      const fileInfo = await Deno.stat(this.path);
       const lockTTL = 1800 * 1000;
       if (
         fileInfo.birthtime &&
