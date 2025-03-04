@@ -9,7 +9,7 @@ const page = await browser.newPage("https://deno.land");
 
 // Take a screenshot of the page and save that to disk
 const screenshot = await page.screenshot();
-Deno.writeFileSync("screenshot.png", screenshot);
+await Deno.writeFile("screenshot.png", screenshot);
 
 // Close the browser
 await browser.close();

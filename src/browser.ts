@@ -42,7 +42,7 @@ async function runCommand(
       await process.status;
 
       try {
-        Deno.removeSync(path);
+        await Deno.remove(path);
       } catch (error) {
         if (!(error instanceof Deno.errors.NotFound)) {
           throw error;
@@ -277,7 +277,7 @@ export async function launch(opts?: LaunchOptions): Promise<Browser> {
   }
 
   if (!args.find((arg) => arg.startsWith("--user-data-dir="))) {
-    const tempDir = Deno.makeTempDirSync();
+    const tempDir = await Deno.makeTempDir();
     args.push(`--user-data-dir=${tempDir}`);
   }
 

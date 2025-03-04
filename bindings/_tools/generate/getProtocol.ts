@@ -1,4 +1,4 @@
-import { existsSync } from "@std/fs/exists";
+import { exists } from "@std/fs/exists";
 import { getBinary } from "../../../src/cache.ts";
 
 export interface JSDocable {
@@ -109,8 +109,8 @@ export interface Protocol {
 }
 
 export async function getProtocol(): Promise<Protocol> {
-  if (existsSync("types.json")) {
-    return JSON.parse(Deno.readTextFileSync("types.json"));
+  if (await exists("types.json")) {
+    return JSON.parse(await Deno.readTextFile("types.json"));
   } else {
     // Configuration
     console.log("1. Getting binary path");

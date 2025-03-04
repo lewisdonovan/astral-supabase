@@ -1,5 +1,5 @@
-import { ensureDir, ensureDirSync } from "@std/fs/ensure-dir";
-import { exists, existsSync } from "@std/fs/exists";
+import { ensureDir } from "@std/fs/ensure-dir";
+import { exists } from "@std/fs/exists";
 import { resolve } from "@std/path/resolve";
 import { dirname } from "@std/path/dirname";
 import { retry } from "@std/async/retry";
@@ -80,11 +80,11 @@ export function getDefaultCachePath(): string {
   return join(path, "astral");
 }
 
-function getCachedConfig(
+async function getCachedConfig(
   { cache = getDefaultCachePath() } = {},
-): Record<string, string> {
+): Promise<Record<string, string>> {
   try {
-    return JSON.parse(Deno.readTextFileSync(resolve(cache, CONFIG_FILE)));
+    return JSON.parse(await Deno.readTextFile(resolve(cache, CONFIG_FILE)));
   } catch {
     return {};
   }
@@ -172,12 +172,12 @@ export async function getBinary(
   // TODO(lino-levan): fix firefox downloading
   const VERSION = SUPPORTED_VERSIONS[browser];
   const product = `${browser}-${SUPPORTED_VERSIONS[browser]}`;
-  const config = getCachedConfig({ cache });
+  const config = await getCachedConfig({ cache });
 
   // If the config doesn't have the revision and there is a lock file, reload config after release
-  if (!config[VERSION] && LOCK_FILES[cache]?.[product]?.exists()) {
+  if (!config[VERSION] && await LOCK_FILES[cache]?.[product]?.exists()) {
     await LOCK_FILES[cache]?.[product]?.waitRelease({ timeout });
-    Object.assign(config, getCachedConfig({ cache }));
+    Object.assign(config, await getCachedConfig({ cache }));
   }
 
   // If the config doesn't have the revision, download it and return that
@@ -202,11 +202,11 @@ export async function getBinary(
       );
     })[0];
 
-    ensureDirSync(cache);
+    await ensureDir(cache);
     const lock = new Lock({ cache });
     LOCK_FILES[cache] ??= {};
     LOCK_FILES[cache][product] = lock;
-    if (!lock.create()) {
+    if (await !lock.create()) {
       return getBinary(browser, { cache, timeout });
     }
     try {
@@ -251,12 +251,12 @@ export async function getBinary(
       );
 
       config[VERSION] = resolve(cache, VERSION);
-      Deno.writeTextFileSync(
+      await Deno.writeTextFile(
         resolve(cache, CONFIG_FILE),
         JSON.stringify(config),
       );
     } finally {
-      LOCK_FILES[cache]?.[product]?.release();
+      await LOCK_FILES[cache]?.[product]?.release();
     }
   }
 
@@ -314,7 +314,7 @@ class Lock {
         fileInfo.birthtime &&
         Date.now() - fileInfo.birthtime.getTime() > lockTTL
       ) {
-        Deno.removeSync(this.path);
+        await Deno.remove(this.path);
         console.log(
           `%c There is an old lock file (${this.path}), this is probably due to a failed download. It has been removed automatically.`,
           "color: #ff0000",
@@ -328,14 +328,14 @@ class Lock {
   }
 
   /** Returns true if lock file exists */
-  exists() {
-    return existsSync(this.path);
+  async exists() {
+    return await exists(this.path);
   }
 
   /** Create a lock file and returns true if it succeeds, false if it was already existing */
-  create() {
+  async create() {
     try {
-      Deno.writeTextFileSync(this.path, `${Deno.pid}`, { createNew: true });
+      await Deno.writeTextFile(this.path, `${Deno.pid}`, { createNew: true });
       return true;
     } catch (error) {
       if (!(error instanceof Deno.errors.AlreadyExists)) {
@@ -346,10 +346,10 @@ class Lock {
   }
 
   /** Release lock file */
-  release() {
+  async release() {
     try {
-      if (Deno.readTextFileSync(this.path) === `${Deno.pid}`) {
-        Deno.removeSync(this.path);
+      if (await Deno.readTextFile(this.path) === `${Deno.pid}`) {
+        await Deno.remove(this.path);
       }
     } catch (error) {
       if (!(error instanceof Deno.errors.NotFound)) {
@@ -360,8 +360,8 @@ class Lock {
 
   /** Wait for lock release */
   async waitRelease({ timeout = 60000 } = {}) {
-    await retry(() => {
-      if (this.exists()) {
+    await retry(async () => {
+      if (await this.exists()) {
         throw new Error(
           `Timeout while waiting for lockfile release at: ${this.path}`,
         );
